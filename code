@@ -1,0 +1,41 @@
+# Import required libraries
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import LabelEncoder, MinMaxScaler, StandardScaler, RobustScaler
+from imblearn.combine import SMOTETomek
+from sklearn.model_selection import StratifiedKFold, train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
+from sklearn.metrics import classification_report, accuracy_score
+from xgboost import XGBClassifier
+import pickle
+
+# Load data
+df = pd.read_csv("predictive_maintenance.csv")
+
+# Basic EDA and preprocessing
+df.drop(df.columns[:2], axis=1, inplace=True)
+le = LabelEncoder()
+df['Failure Type'] = le.fit_transform(df['Failure Type'])
+
+# Split train/test
+X_train, X_test = train_test_split(df, test_size=0.3)
+
+# Data balancing using SMOTETomek
+df_train = X_train.drop(['Torque [Nm]'], axis=1)
+X = pd.get_dummies(df_train, drop_first=True)
+y = X_train['Failure Type']
+smk = SMOTETomek(random_state=42)
+X_res, y_res = smk.fit_resample(X, y)
+
+# Train XGBoost model
+xgb_model = XGBClassifier()
+xgb_model.fit(X_res, y_res)
+y_pred = xgb_model.predict(X_test.drop(['Torque [Nm]'], axis=1))
+print(classification_report(X_test['Failure Type'], y_pred))
+
+# Save model
+with open("XG_boost_pkl", "wb") as files:
+    pickle.dump(xgb_model, files)
